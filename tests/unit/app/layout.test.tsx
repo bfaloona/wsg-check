@@ -1,10 +1,11 @@
 import { describe, it, expect, vi } from 'vitest'
 import { render, screen } from '@testing-library/react'
+import { readFileSync } from 'node:fs'
+import { resolve } from 'node:path'
 
 // Activate manual mocks
 vi.mock('next/link')
 vi.mock('next/navigation')
-vi.mock('next/font/google')
 
 // Stub sub-components to keep the layout test focused
 vi.mock('@/app/components/Header', () => ({
@@ -78,15 +79,9 @@ describe('RootLayout — rendered output', () => {
     expect(noscript).not.toBeNull()
   })
 
-  it('html element carries the Inter CSS variable class', () => {
-    render(
-      <RootLayout>
-        <p>test content</p>
-      </RootLayout>
-    )
-    // layout applies inter.variable (the CSS custom-property name) to <html>
-    // The mock returns variable: '--font-inter'
-    expect(document.documentElement.className).toContain('--font-inter')
+  it('does not load a web font (uses the Verdant system-font stack)', () => {
+    const source = readFileSync(resolve(__dirname, '../../../src/app/layout.tsx'), 'utf8')
+    expect(source).not.toMatch(/next\/font/)
   })
 
   it('sets lang="en" on the html element', () => {
