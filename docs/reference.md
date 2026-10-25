@@ -411,7 +411,7 @@ Scans inline `<style>` blocks for CSS animation declarations (`@keyframes`, `ani
 Checks font delivery for efficiency and readability:
 
 1. **WOFF2 format** — at least one font file should use `.woff2` (30% smaller than WOFF).
-2. **`font-display` descriptor** — prevents invisible text during font load (FOIT).
+2. **`font-display` descriptor** — prevents invisible text during font load (FOIT). Only inline `<style>` blocks are searched. With external CSS linked and no inline `@font-face`, it is noted as not verifiable rather than missing; if WOFF2 and file count raise nothing, the check returns `info` (not scored).
 3. **Font file count** — warns if more than 4 font files are referenced (each requires a separate download).
 
 Not using WOFF2 at all → `fail`; other issues → `warn`.
