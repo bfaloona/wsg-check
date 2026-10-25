@@ -248,6 +248,8 @@ Counts third-party scripts loaded by the page. Each third-party script adds a ne
 
 Checks for `prefers-color-scheme`, `prefers-reduced-motion`, and `prefers-reduced-data` CSS media queries. These signals indicate support for user preferences; this static check does not measure energy savings.
 
+Only inline `<style>` blocks and `<link media>` attributes are searched. If none of the three is found and the page links external CSS, the check returns `info` (not scored).
+
 #### `checkResponsiveDesign` — WSG 3.10
 
 Checks for a `<meta name="viewport">` tag, responsive images (any `<img>` with `srcset`), and at least one CSS media query in inline styles or style blocks.
