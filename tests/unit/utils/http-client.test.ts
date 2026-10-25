@@ -426,13 +426,42 @@ describe('HttpClient — host policy', () => {
     }
   })
 
-  it('keeps refusing loopback redirects when no policy is set', async () => {
+  it('follows a redirect back to the host that issued it when no policy is set', async () => {
     mockGet.mockResolvedValueOnce(axiosResp(404, '')) // robots
     mockGet.mockResolvedValueOnce(axiosResp(307, '', { location: '/en' }))
+    mockGet.mockResolvedValueOnce(axiosResp(200, '<html/>'))
+
+    const result = await new HttpClient().fetch('http://localhost:3000/')
+
+    expect(result.ok ? undefined : result.error.message).toBeUndefined()
+    if (!result.ok) return
+    expect(result.value.url).toBe('http://localhost:3000/en')
+    expect(result.value.redirectChain).toHaveLength(1)
+  })
+
+  it('still refuses a redirect from a public host into loopback when no policy is set', async () => {
+    mockGet.mockResolvedValueOnce(axiosResp(404, '')) // robots
+    mockGet.mockResolvedValueOnce(axiosResp(302, '', { location: 'http://localhost:6379/' }))
+
+    const result = await new HttpClient().fetch('https://example.com/')
+
+    expect(result.ok).toBe(false)
+    if (result.ok) return
+    expect(result.error.message).toContain('not allowed for security reasons')
+    expect(mockGet).toHaveBeenCalledTimes(2)
+  })
+
+  it('compares the redirect target against the host that issued it, not the start URL', async () => {
+    mockGet.mockResolvedValueOnce(axiosResp(404, '')) // robots
+    mockGet.mockResolvedValueOnce(axiosResp(302, '', { location: 'https://example.com/' }))
+    mockGet.mockResolvedValueOnce(axiosResp(302, '', { location: 'http://localhost:3000/x' }))
 
     const result = await new HttpClient().fetch('http://localhost:3000/')
 
     expect(result.ok).toBe(false)
+    if (result.ok) return
+    expect(result.error.message).toContain('not allowed for security reasons: localhost')
+    expect(mockGet).toHaveBeenCalledTimes(3)
   })
 
   it('passes the abort signal to every request', async () => {

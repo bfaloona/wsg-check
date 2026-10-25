@@ -64,7 +64,8 @@ export interface HttpClientOptions {
   /**
    * Network access policy applied to the initial URL (before robots.txt is
    * fetched) and to every redirect hop. When omitted, only redirect hops are
-   * checked, and every private or loopback target is refused.
+   * checked, and private or loopback targets are refused unless the hop stays
+   * on the host that issued it.
    */
   hostPolicy?: HostPolicy
   /** Aborts in-flight requests and stops retries, e.g. when a caller cancels. */
@@ -279,7 +280,7 @@ export class HttpClient {
         const nextUrl = new URL(location, currentUrl).href
 
         // SSRF guard: validate the redirect target before following it.
-        currentClass = await this.checkRedirectTarget(nextUrl, startUrl, currentClass)
+        currentClass = await this.checkRedirectTarget(nextUrl, currentUrl, startUrl, currentClass)
         currentUrl = nextUrl
         continue
       }
@@ -297,6 +298,7 @@ export class HttpClient {
    */
   private async checkRedirectTarget(
     nextUrl: string,
+    fromUrl: string,
     startUrl: string,
     fromClass: AddressClass | undefined
   ): Promise<AddressClass | undefined> {
@@ -312,6 +314,8 @@ export class HttpClient {
     }
 
     const nextHostname = new URL(nextUrl).hostname
+    // The issuing host was already fetched, so staying on it adds no new destination.
+    if (nextHostname === new URL(fromUrl).hostname) return undefined
     if (isDisallowedHost(nextHostname)) {
       throw new FetchError(
         `Redirect target host is not allowed for security reasons: ${nextHostname}`,
