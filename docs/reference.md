@@ -485,9 +485,9 @@ Verifies the page response includes effective HTTP caching directives:
 Checks for offline/PWA support via two standard mechanisms:
 
 1. **Web App Manifest** — `<link rel="manifest">` in the document `<head>`.
-2. **Service Worker** — `navigator.serviceWorker.register(...)` call in the page source.
+2. **Service Worker** — `navigator.serviceWorker.register(...)` call in inline `<script>` content. External scripts are not fetched.
 
-Both present → `pass`; one present → `warn`; neither → `fail`.
+Both present → `pass`; one present → `warn`; neither → `fail`. When the manifest is present, no inline registration is found, and the page links external scripts, the check returns `info` (not scored) because the registration may live in those scripts.
 
 #### `checkCompression` — WSG 4.3
 
