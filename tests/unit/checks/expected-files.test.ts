@@ -6,8 +6,8 @@ import { expectRecommendationAndResources } from './helpers'
 
 // ─── Fixtures ─────────────────────────────────────────────────────────────────
 
-function makePageData(opts: { links?: LinkRef[] } = {}): PageData {
-  const { links = [] } = opts
+function makePageData(opts: { links?: LinkRef[]; robotsSitemaps?: string[] } = {}): PageData {
+  const { links = [], robotsSitemaps } = opts
   const body = '<!DOCTYPE html><html lang="en"><head></head><body></body></html>'
   return {
     url: 'https://example.com',
@@ -20,6 +20,7 @@ function makePageData(opts: { links?: LinkRef[] } = {}): PageData {
       redirectChain: [],
       fromCache: false,
       contentLength: body.length,
+      robotsSitemaps,
     },
     parsedPage: {
       title: 'Test',
@@ -123,6 +124,31 @@ describe('checkExpectedFiles (WSG 3.17)', () => {
     const result = await checkExpectedFiles(makePageData({ links: [] }))
     const firstResource = expectRecommendationAndResources(result)
     expect(firstResource).toContain('w3.org')
+  })
+
+  it('treats a Sitemap: declaration in robots.txt as the sitemap reference', async () => {
+    const links = ALL_EXPECTED_LINKS.filter((l) => l.rel !== 'sitemap')
+    const result = await checkExpectedFiles(
+      makePageData({ links, robotsSitemaps: ['https://example.com/sitemap.xml'] })
+    )
+    expect(result.status).toBe('pass')
+    expect(result.score).toBe(100)
+  })
+
+  it('still reports the sitemap missing when robots.txt declares none', async () => {
+    const links = ALL_EXPECTED_LINKS.filter((l) => l.rel !== 'sitemap')
+    const result = await checkExpectedFiles(makePageData({ links, robotsSitemaps: [] }))
+    expect(result.status).toBe('warn')
+    expect(result.details).toContain('sitemap')
+  })
+
+  it('downgrades fail to warn when robots.txt declares a sitemap but nothing is linked', async () => {
+    const result = await checkExpectedFiles(
+      makePageData({ links: [], robotsSitemaps: ['https://example.com/sitemap.xml'] })
+    )
+    expect(result.status).toBe('warn')
+    expect(result.score).toBe(50)
+    expect(result.details).not.toContain('sitemap')
   })
 })
 
