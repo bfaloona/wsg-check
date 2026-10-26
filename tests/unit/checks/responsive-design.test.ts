@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest'
 import { checkResponsiveDesign } from '@/checks/responsive-design'
 import type { PageData } from '@/core/types'
 import type { MetaTag, ResourceReference } from '@/utils/html-parser'
+import { parseHtml } from '@/utils/html-parser'
 import { expectRecommendationAndResources } from './helpers'
 
 // ─── Fixtures ─────────────────────────────────────────────────────────────────
@@ -170,6 +171,103 @@ describe('checkResponsiveDesign (WSG 3.13)', () => {
     )
     // No inline styles → no @media found → warn
     expect(result.status).toBe('warn')
+  })
+
+  describe('media queries with a linked external stylesheet', () => {
+    const STYLESHEET: ResourceReference = {
+      type: 'stylesheet',
+      url: 'https://example.com/s.css',
+      attributes: { rel: 'stylesheet', href: '/s.css' },
+    }
+    /** Repro fixture /extcss/: viewport, one linked stylesheet, no inline CSS. */
+    const EXTERNAL_CSS_ONLY_HTML = `<!DOCTYPE html><html lang=en><head><meta charset="utf-8"><meta name="viewport" content="width=device-width"><title>t</title><link rel="stylesheet" href="/s.css"></head><body><p>x</p></body></html>`
+
+    it('reports info, not warn, when no inline CSS exists and a stylesheet is linked', async () => {
+      const result = await checkResponsiveDesign(
+        makePageData({ metaTags: [VIEWPORT_META], resources: [STYLESHEET] })
+      )
+      expect(result.status).toBe('info')
+      expect(result.score).toBe(0)
+      expect(result.message).toContain('could not be checked')
+      expect(result.details).toContain('not verifiable')
+      expect(result.machineTestable).toBe(true)
+    })
+
+    it('reports info when inline CSS has no @media and a stylesheet is linked', async () => {
+      const result = await checkResponsiveDesign(
+        makePageData({
+          metaTags: [VIEWPORT_META],
+          resources: [STYLESHEET],
+          body: BODY_WITHOUT_MEDIA_QUERY,
+        })
+      )
+      expect(result.status).toBe('info')
+    })
+
+    it('treats an inline @import as linked external CSS', async () => {
+      const result = await checkResponsiveDesign(
+        makePageData({
+          metaTags: [VIEWPORT_META],
+          resources: [],
+          body: '<!DOCTYPE html><html lang="en"><head><style>@import url("/s.css");</style></head><body></body></html>',
+        })
+      )
+      expect(result.status).toBe('info')
+    })
+
+    it('includes a recommendation and resources link on info', async () => {
+      const result = await checkResponsiveDesign(
+        makePageData({ metaTags: [VIEWPORT_META], resources: [STYLESHEET] })
+      )
+      expect(result.status).toBe('info')
+      const firstResource = expectRecommendationAndResources(result)
+      expect(firstResource).toContain('w3.org')
+    })
+
+    it('still warns on a srcset issue, noting media queries instead of flagging them', async () => {
+      const result = await checkResponsiveDesign(
+        makePageData({
+          metaTags: [VIEWPORT_META],
+          resources: [STYLESHEET, makeImage('https://example.com/photo.jpg')],
+        })
+      )
+      expect(result.status).toBe('warn')
+      expect(result.score).toBe(50)
+      expect(result.details).toContain('srcset')
+      expect(result.details).toContain('not verifiable')
+      expect(result.details).not.toContain('No @media rules')
+    })
+
+    it('still fails without a viewport meta tag', async () => {
+      const result = await checkResponsiveDesign(
+        makePageData({ metaTags: [], resources: [STYLESHEET] })
+      )
+      expect(result.status).toBe('fail')
+      expect(result.details).not.toContain('not verifiable')
+    })
+
+    it('still passes when an inline @media rule is present', async () => {
+      const result = await checkResponsiveDesign(
+        makePageData({
+          metaTags: [VIEWPORT_META],
+          resources: [STYLESHEET],
+          body: BODY_WITH_MEDIA_QUERY,
+        })
+      )
+      expect(result.status).toBe('pass')
+    })
+
+    it('reports info for a parsed page that links only an external stylesheet', async () => {
+      const parsed = parseHtml(EXTERNAL_CSS_ONLY_HTML, 'https://example.com')
+      const result = await checkResponsiveDesign(
+        makePageData({
+          metaTags: parsed.metaTags,
+          resources: parsed.resources,
+          body: EXTERNAL_CSS_ONLY_HTML,
+        })
+      )
+      expect(result.status).toBe('info')
+    })
   })
 
   it('includes a recommendation and resources link on warn', async () => {

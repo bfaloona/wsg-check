@@ -254,6 +254,8 @@ Only inline `<style>` blocks and `<link media>` attributes are searched. If none
 
 Checks for a `<meta name="viewport">` tag, responsive images (any `<img>` with `srcset`), and at least one CSS media query in inline styles or style blocks.
 
+Only inline `<style>` blocks are searched for media queries. If none is found and the page links external CSS, that signal is noted as not verifiable rather than reported as an issue; if viewport and srcset raise nothing, the check returns `info` (not scored).
+
 #### `checkSustainableJs` — WSG 3.11
 
 Detects signals of unnecessary JavaScript: external script count, `document.write()` usage, and large inline script blocks.
