@@ -205,18 +205,11 @@ describe('checkResponsiveDesign (WSG 3.13)', () => {
       expect(result.status).toBe('info')
     })
 
-    it('treats an inline @import as linked external CSS', async () => {
-      const result = await checkResponsiveDesign(
-        makePageData({
-          metaTags: [VIEWPORT_META],
-          resources: [],
-          body: '<!DOCTYPE html><html lang="en"><head><style>@import url("/s.css");</style></head><body></body></html>',
-        })
-      )
-      expect(result.status).toBe('info')
-    })
+    const page = (css: string, body = '') =>
+      `<!DOCTYPE html><html lang="en"><head><style>${css}</style></head><body>${body}</body></html>`
 
     it.each([
+      '@import url("/s.css");',
       '@import "a.css";',
       "@import 'a.css';",
       '@import url("a.css") screen and (min-width: 600px);',
@@ -224,63 +217,36 @@ describe('checkResponsiveDesign (WSG 3.13)', () => {
       '@import url(a.css) supports(display: grid);',
     ])('treats %s as linked external CSS', async (rule) => {
       const result = await checkResponsiveDesign(
-        makePageData({
-          metaTags: [VIEWPORT_META],
-          resources: [],
-          body: `<!DOCTYPE html><html lang="en"><head><style>${rule}</style></head><body></body></html>`,
-        })
+        makePageData({ metaTags: [VIEWPORT_META], body: page(rule) })
       )
       expect(result.status).toBe('info')
     })
 
-    it('ignores @import in page text between two style blocks', async () => {
-      const result = await checkResponsiveDesign(
-        makePageData({
-          metaTags: [VIEWPORT_META],
-          resources: [],
-          body:
-            '<!DOCTYPE html><html lang="en"><head><style>body { margin: 0; }</style></head>' +
-            '<body><p>Use @import to load CSS.</p><style>p { color: red; }</style></body></html>',
-        })
-      )
-      expect(result.status).toBe('warn')
-      expect(result.details).toContain('No @media rules')
-    })
-
-    it('ignores @media in page text between two style blocks', async () => {
-      const result = await checkResponsiveDesign(
-        makePageData({
-          metaTags: [VIEWPORT_META],
-          resources: [],
-          body:
-            '<!DOCTYPE html><html lang="en"><head><style>body { margin: 0; }</style></head>' +
-            '<body><p>Use @media to adapt layouts.</p><style>p { color: red; }</style></body></html>',
-        })
-      )
-      expect(result.status).toBe('warn')
-      expect(result.details).toContain('No @media rules')
-    })
-
-    it('ignores a commented-out @import, so no external CSS is assumed', async () => {
-      const result = await checkResponsiveDesign(
-        makePageData({
-          metaTags: [VIEWPORT_META],
-          resources: [],
-          body: '<!DOCTYPE html><html lang="en"><head><style>/* @import url("/old.css"); */</style></head><body></body></html>',
-        })
-      )
-      expect(result.status).toBe('warn')
-      expect(result.details).toContain('No @media rules')
-    })
-
-    it('does not credit a commented-out @media rule', async () => {
-      const result = await checkResponsiveDesign(
-        makePageData({
-          metaTags: [VIEWPORT_META],
-          resources: [],
-          body: '<!DOCTYPE html><html lang="en"><head><style>/* @media (max-width: 600px) { .nav { display: none; } } */</style></head><body></body></html>',
-        })
-      )
+    it.each([
+      {
+        name: 'ignores @import in page text between two style blocks',
+        body: page(
+          'body { margin: 0; }',
+          '<p>Use @import to load CSS.</p><style>p { color: red; }</style>'
+        ),
+      },
+      {
+        name: 'ignores @media in page text between two style blocks',
+        body: page(
+          'body { margin: 0; }',
+          '<p>Use @media to adapt layouts.</p><style>p { color: red; }</style>'
+        ),
+      },
+      {
+        name: 'ignores a commented-out @import, so no external CSS is assumed',
+        body: page('/* @import url("/old.css"); */'),
+      },
+      {
+        name: 'does not credit a commented-out @media rule',
+        body: page('/* @media (max-width: 600px) { .nav { display: none; } } */'),
+      },
+    ])('$name', async ({ body }) => {
+      const result = await checkResponsiveDesign(makePageData({ metaTags: [VIEWPORT_META], body }))
       expect(result.status).toBe('warn')
       expect(result.details).toContain('No @media rules')
     })
