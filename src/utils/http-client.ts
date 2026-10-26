@@ -70,7 +70,7 @@ export interface HttpClientOptions {
   hostPolicy?: HostPolicy
   /** Aborts in-flight requests and stops retries, e.g. when a caller cancels. */
   signal?: AbortSignal
-  /** Extra headers (e.g. a Cookie) for the page fetch. Not sent to robots.txt, other hosts, or on an https to http downgrade. */
+  /** Extra headers (e.g. a Cookie) for the page fetch. Not sent to robots.txt, other hosts, or over plain http after an https hop. */
   headers?: Readonly<Record<string, string>>
 }
 
@@ -92,18 +92,23 @@ const MAX_REDIRECTS = 10
 
 /**
  * Headers for one hop: the configured set only if it stays on the start
- * URL's hostname without an https to http downgrade, else none.
+ * URL's hostname and is not a plaintext hop after any https hop, else none.
+ * `priorHops` are the redirects already followed in this chain.
  */
 export const requestHeaders = (
   headers: Readonly<Record<string, string>>,
   startUrl: string,
-  currentUrl: string
+  currentUrl: string,
+  priorHops: ReadonlyArray<string>
 ): { headers?: Readonly<Record<string, string>> } => {
   if (Object.keys(headers).length === 0) return {}
   const start = new URL(startUrl)
   const current = new URL(currentUrl)
   const sameHost = current.hostname === start.hostname
-  const downgraded = start.protocol === 'https:' && current.protocol === 'http:'
+  // The start URL alone cannot tell whether the chain has already moved to
+  // https (http -> https -> http), so look at every earlier hop.
+  const isHttps = (url: string): boolean => new URL(url).protocol === 'https:'
+  const downgraded = current.protocol === 'http:' && [startUrl, ...priorHops].some(isHttps)
   return sameHost && !downgraded ? { headers } : {}
 }
 
@@ -284,7 +289,12 @@ export class HttpClient {
       const resp = await this.axiosInstance.get<string>(currentUrl, {
         responseType: 'text',
         ...this.connectOptions(currentClass),
-        ...requestHeaders(this.extraHeaders, startUrl, currentUrl),
+        ...requestHeaders(
+          this.extraHeaders,
+          startUrl,
+          currentUrl,
+          redirectChain.map((entry) => entry.url)
+        ),
       })
 
       if (resp.status >= 300 && resp.status < 400) {

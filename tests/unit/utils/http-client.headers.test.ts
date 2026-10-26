@@ -104,6 +104,42 @@ describe('HttpClient request headers', () => {
     expect(result.ok && result.value.url).toBe('http://example.com/en')
   })
 
+  it('does not send headers on a plaintext hop after the chain has used https (http -> https -> http)', async () => {
+    queue(
+      axiosResp(302, '', { location: 'https://example.com/secure' }),
+      axiosResp(302, '', { location: 'http://example.com/final' }),
+      axiosResp(200, '<html/>')
+    )
+    const result = await new HttpClient({ headers: HEADERS }).fetch('http://example.com/')
+    expect(callHeaders(1)).toEqual(HEADERS)
+    expect(callHeaders(2)).toEqual(HEADERS)
+    expect(callHeaders(3)).toBeUndefined()
+    expect(result.ok && result.value.url).toBe('http://example.com/final')
+  })
+
+  it('keeps headers off every plaintext hop after a downgrade, not only the first (https -> http -> http)', async () => {
+    queue(
+      axiosResp(302, '', { location: 'http://example.com/a' }),
+      axiosResp(302, '', { location: 'http://example.com/b' }),
+      axiosResp(200, '<html/>')
+    )
+    await new HttpClient({ headers: HEADERS }).fetch('https://example.com/')
+    expect(callHeaders(1)).toEqual(HEADERS)
+    expect(callHeaders(2)).toBeUndefined()
+    expect(callHeaders(3)).toBeUndefined()
+  })
+
+  it('sends headers again on a same-host https hop that follows a plaintext hop (https -> http -> https)', async () => {
+    queue(
+      axiosResp(302, '', { location: 'http://example.com/plain' }),
+      axiosResp(302, '', { location: 'https://example.com/secure' }),
+      axiosResp(200, '<html/>')
+    )
+    await new HttpClient({ headers: HEADERS }).fetch('https://example.com/')
+    expect(callHeaders(2)).toBeUndefined()
+    expect(callHeaders(3)).toEqual(HEADERS)
+  })
+
   it('leaves the instance User-Agent in place when headers are set', () => {
     new HttpClient({ headers: HEADERS })
     const config = (mockCreate.mock.calls[0] as unknown[])[0] as { headers: unknown }
@@ -111,8 +147,8 @@ describe('HttpClient request headers', () => {
   })
 
   it('requestHeaders returns nothing for an empty record, so axios gets no headers key', () => {
-    expect(requestHeaders({}, 'https://example.com/', 'https://example.com/')).toEqual({})
-    expect(requestHeaders(HEADERS, 'http://example.com/', 'https://example.com/')).toEqual({
+    expect(requestHeaders({}, 'https://example.com/', 'https://example.com/', [])).toEqual({})
+    expect(requestHeaders(HEADERS, 'http://example.com/', 'https://example.com/', [])).toEqual({
       headers: HEADERS,
     })
   })
