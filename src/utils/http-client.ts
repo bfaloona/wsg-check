@@ -64,8 +64,9 @@ export interface HttpClientOptions {
   /**
    * Network access policy applied to the initial URL (before robots.txt is
    * fetched) and to every redirect hop. When omitted, only redirect hops are
-   * checked, and private or loopback targets are refused unless the hop stays
-   * on the host that issued it.
+   * checked, by name and by DNS, and private or loopback targets are refused.
+   * The one exception is a hop that stays on a start host the caller named as
+   * local (`localhost`, `*.local`, or a private IP literal).
    */
   hostPolicy?: HostPolicy
   /** Aborts in-flight requests and stops retries, e.g. when a caller cancels. */
@@ -314,14 +315,16 @@ export class HttpClient {
     }
 
     const nextHostname = new URL(nextUrl).hostname
-    // The issuing host was already fetched, so staying on it adds no new destination.
-    if (nextHostname === new URL(fromUrl).hostname) return undefined
     if (isDisallowedHost(nextHostname)) {
+      // A local name here can only be the caller's own start host: the API refuses
+      // one at validation, and a hop that introduces one is refused just below.
+      if (nextHostname === new URL(fromUrl).hostname) return undefined
       throw new FetchError(
         `Redirect target host is not allowed for security reasons: ${nextHostname}`,
         startUrl
       )
     }
+    // Same-host hops are not exempt: the name may resolve somewhere else by now.
     if (await dnsResolvesToPrivateAddress(nextHostname)) {
       throw new FetchError(
         `Redirect target resolves to a private or unreachable address: ${nextHostname}`,

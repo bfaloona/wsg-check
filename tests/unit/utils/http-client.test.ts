@@ -451,6 +451,28 @@ describe('HttpClient — host policy', () => {
     expect(mockGet).toHaveBeenCalledTimes(2)
   })
 
+  it('re-checks DNS on a same-host redirect hop when no policy is set', async () => {
+    // The API validated attacker.example while it resolved publicly; by the
+    // time its page redirects to another port on the same name, the name
+    // resolves to loopback. The hop must be refused, not waved through as
+    // "same host". (The no-policy client makes no lookup for the start URL,
+    // so the first resolution is not mocked here.)
+    lookupMock.mockResolvedValue([{ address: '127.0.0.1', family: 4 }]) // NOSONAR - intentional loopback IP
+    mockGet.mockResolvedValueOnce(axiosResp(404, '')) // robots
+    mockGet.mockResolvedValueOnce(
+      axiosResp(302, '', { location: 'https://attacker.example:6379/' })
+    )
+    mockGet.mockResolvedValueOnce(axiosResp(200, '<html/>'))
+
+    const result = await new HttpClient().fetch('https://attacker.example/')
+
+    expect(result.ok).toBe(false)
+    if (result.ok) return
+    expect(result.error.message).toContain('resolves to a private or unreachable address')
+    expect(lookupMock).toHaveBeenCalledWith('attacker.example', { all: true })
+    expect(mockGet).toHaveBeenCalledTimes(2)
+  })
+
   it('compares the redirect target against the host that issued it, not the start URL', async () => {
     mockGet.mockResolvedValueOnce(axiosResp(404, '')) // robots
     mockGet.mockResolvedValueOnce(axiosResp(302, '', { location: 'https://example.com/' }))
