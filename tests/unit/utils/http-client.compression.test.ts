@@ -25,10 +25,10 @@ const send = (res: http.ServerResponse, body: Buffer | string, encoding?: string
 }
 
 const server = http.createServer((req, res) => {
-  if (req.url === '/gzip') return send(res, GZIPPED, 'gzip')
-  if (req.url === '/br') return send(res, BROTLI, 'br')
-  if (req.url === '/plain') return send(res, HTML)
-  res.writeHead(404).end()
+  if (req.url === '/gzip') send(res, GZIPPED, 'gzip')
+  else if (req.url === '/br') send(res, BROTLI, 'br')
+  else if (req.url === '/plain') send(res, HTML)
+  else res.writeHead(404).end()
 })
 
 let baseUrl = ''
