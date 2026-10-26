@@ -124,25 +124,15 @@ describe('checkHtmlVersion (WSG 3.19)', () => {
     expect(result.details).not.toContain('<!!')
   })
 
-  it('warns when a deprecated <font> element is found in the body', async () => {
-    const body = '<!DOCTYPE html><html lang="en"><body><font color="red">text</font></body></html>'
+  it.each([
+    ['<font>', '<font color="red">text</font>'],
+    ['<center>', '<center>centered</center>'],
+    ['<marquee>', '<marquee>scroll</marquee>'],
+  ])('warns when a deprecated %s element is found in the body', async (tag, markup) => {
+    const body = `<!DOCTYPE html><html lang="en"><body>${markup}</body></html>`
     const result = await checkHtmlVersion(makePageData({ body }))
     expect(result.status).toBe('warn')
-    expect(result.details).toContain('<font>')
-  })
-
-  it('warns when a deprecated <center> element is found', async () => {
-    const body = '<!DOCTYPE html><html lang="en"><body><center>centered</center></body></html>'
-    const result = await checkHtmlVersion(makePageData({ body }))
-    expect(result.status).toBe('warn')
-    expect(result.details).toContain('<center>')
-  })
-
-  it('warns when deprecated <marquee> is found', async () => {
-    const body = '<!DOCTYPE html><html lang="en"><body><marquee>scroll</marquee></body></html>'
-    const result = await checkHtmlVersion(makePageData({ body }))
-    expect(result.status).toBe('warn')
-    expect(result.details).toContain('<marquee>')
+    expect(result.details).toContain(tag)
   })
 
   it('includes a recommendation and resources link on warn', async () => {
