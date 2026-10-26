@@ -170,6 +170,19 @@ describe('isDisallowedHost', () => {
     expect(isDisallowedHost('2001:db8::1')).toBe(false)
   })
 
+  it('returns true for bracketed private IPv6 literals as URL.hostname reports them', () => {
+    expect(isDisallowedHost('[::1]')).toBe(true)
+    expect(isDisallowedHost('[fd00::1]')).toBe(true)
+  })
+
+  it('returns false for a bracketed public IPv6 literal', () => {
+    expect(isDisallowedHost('[2001:db8::1]')).toBe(false)
+  })
+
+  it('returns true for localhost with a trailing root dot', () => {
+    expect(isDisallowedHost('localhost.')).toBe(true)
+  })
+
   it('returns false for regular public domain names', () => {
     expect(isDisallowedHost('example.com')).toBe(false)
     expect(isDisallowedHost('google.com')).toBe(false)

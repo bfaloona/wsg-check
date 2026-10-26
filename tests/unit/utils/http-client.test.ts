@@ -439,6 +439,23 @@ describe('HttpClient — host policy', () => {
     expect(result.value.redirectChain).toHaveLength(1)
   })
 
+  it('follows an IPv6 loopback self-redirect when no policy is set', async () => {
+    // Real lookup() rejects a bracketed literal, so if the hop wrongly reaches
+    // the DNS guard instead of the local-name exemption it must be refused.
+    lookupMock.mockRejectedValue(new Error('ENOTFOUND'))
+    mockGet.mockResolvedValueOnce(axiosResp(404, '')) // robots
+    mockGet.mockResolvedValueOnce(axiosResp(308, '', { location: '/slash/' }))
+    mockGet.mockResolvedValueOnce(axiosResp(200, '<html/>'))
+
+    const result = await new HttpClient().fetch('http://[::1]:3000/slash')
+
+    expect(result.ok ? undefined : result.error.message).toBeUndefined()
+    if (!result.ok) return
+    expect(result.value.url).toBe('http://[::1]:3000/slash/')
+    expect(result.value.redirectChain).toHaveLength(1)
+    expect(lookupMock).not.toHaveBeenCalled()
+  })
+
   it('still refuses a redirect from a public host into loopback when no policy is set', async () => {
     mockGet.mockResolvedValueOnce(axiosResp(404, '')) // robots
     mockGet.mockResolvedValueOnce(axiosResp(302, '', { location: 'http://localhost:6379/' }))

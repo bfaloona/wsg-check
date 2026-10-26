@@ -87,6 +87,17 @@ describe('validateTargetUrl', () => {
     expect(result.ok).toBe(false)
   })
 
+  it('rejects IPv6 private literals by name, before any DNS lookup', async () => {
+    lookupMock.mockReset()
+    for (const url of ['http://[::1]:3000', 'http://[fd00::1]:3000', 'http://localhost.:3000']) {
+      const result = await validateTargetUrl(url)
+      expect(result.ok).toBe(false)
+      if (result.ok) continue
+      expect(result.error.message).toBe('Target URL host is not allowed for security reasons.')
+    }
+    expect(lookupMock).not.toHaveBeenCalled()
+  })
+
   it('rejects private IPv4 hosts', async () => {
     const result = await validateTargetUrl('https://192.168.0.5')
     expect(result.ok).toBe(false)

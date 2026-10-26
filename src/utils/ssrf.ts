@@ -9,6 +9,7 @@
 
 import { isIP } from 'node:net'
 import { lookup } from 'node:dns/promises'
+import { normalizeHost } from './host-policy'
 
 /**
  * Returns `true` when the IPv4 address is in a private/loopback range.
@@ -51,13 +52,14 @@ export const isPrivateIpv6 = (address: string): boolean => {
 
 /** Returns `true` when the hostname is a private/loopback address or name. */
 export const isDisallowedHost = (hostname: string): boolean => {
-  const lower = hostname.toLowerCase()
-  if (lower === 'localhost') return true
-  if (lower.endsWith('.local')) return true
+  // `URL.hostname` keeps the brackets around IPv6 literals, which `isIP` rejects.
+  const host = normalizeHost(hostname)
+  if (host === 'localhost') return true
+  if (host.endsWith('.local')) return true
 
-  const ipVersion = isIP(lower)
-  if (ipVersion === 4) return isPrivateIpv4(lower)
-  if (ipVersion === 6) return isPrivateIpv6(lower)
+  const ipVersion = isIP(host)
+  if (ipVersion === 4) return isPrivateIpv4(host)
+  if (ipVersion === 6) return isPrivateIpv6(host)
 
   return false
 }
