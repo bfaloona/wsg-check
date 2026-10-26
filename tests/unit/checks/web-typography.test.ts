@@ -202,6 +202,22 @@ describe('checkWebTypography (WSG 2.16)', () => {
       expect(result.details).toContain('not verifiable')
     })
 
+    it('ignores a commented-out @import, so no external CSS is assumed', async () => {
+      const body = `<!DOCTYPE html><html><head><style>/* @import url("/fonts.css"); */</style></head><body></body></html>`
+      const result = await checkWebTypography(makePageData({ fonts: [woff2], body }))
+      expect(result.status).toBe('warn')
+      expect(result.details).toContain('No font-display descriptor')
+    })
+
+    it('does not credit a commented-out font-display descriptor', async () => {
+      const body = `<!DOCTYPE html><html><head><style>
+@font-face { font-family: "MyFont"; src: url("font.woff2"); /* font-display: swap; */ }
+</style></head><body></body></html>`
+      const result = await checkWebTypography(makePageData({ fonts: [woff2], body }))
+      expect(result.status).toBe('warn')
+      expect(result.details).toContain('No font-display descriptor')
+    })
+
     it('info result still carries a recommendation and resources', async () => {
       const result = await checkWebTypography(
         makePageData({ fonts: [woff2], resources: [STYLESHEET] })

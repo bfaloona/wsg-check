@@ -45,6 +45,10 @@ const FONT_FACE_PATTERN = /@font-face/i
 /** An inline `@import` pulls in external CSS the parser does not list as a resource. */
 const CSS_IMPORT_PATTERN = /@import\b/i
 
+// A commented-out @import or font-display must not count, so comments are
+// dropped before any search. Stripped per block: each <style> is its own stylesheet.
+const CSS_COMMENT_PATTERN = /\/\*[\s\S]*?\*\//g
+
 const FONT_DISPLAY_NOT_VERIFIABLE =
   'font-display not verifiable: declared in external CSS, which is not analysed'
 
@@ -58,7 +62,7 @@ function extractStyleBlocks(body: string): string {
   const regex = new RegExp(STYLE_BLOCK_PATTERN.source, 'gi')
   let match: RegExpExecArray | null
   while ((match = regex.exec(body)) !== null) {
-    contents.push(match[1])
+    contents.push(match[1].replace(CSS_COMMENT_PATTERN, ''))
   }
   return contents.join('\n')
 }

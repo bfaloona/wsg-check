@@ -192,6 +192,23 @@ describe('checkPreferenceMediaQueries (WSG 3.12)', () => {
       expect(result.status).toBe('info')
     })
 
+    it('ignores a commented-out @import, so no external CSS is assumed', async () => {
+      const body = `<!DOCTYPE html><html lang="en"><head><style>/* @import url("/s.css"); */</style></head><body></body></html>`
+      const result = await checkPreferenceMediaQueries(makePageData(body))
+      expect(result.status).toBe('warn')
+    })
+
+    it('does not credit preference features inside a CSS comment', async () => {
+      const body = `<!DOCTYPE html><html lang="en"><head><style>
+/* @media (prefers-color-scheme: dark) { body { background: #000; } } */
+@media (prefers-reduced-motion: reduce) { * { animation: none; } }
+</style></head><body></body></html>`
+      const result = await checkPreferenceMediaQueries(makePageData(body))
+      expect(result.status).toBe('warn')
+      expect(result.details).toContain('Found: prefers-reduced-motion.')
+      expect(result.details).toContain('Missing: prefers-color-scheme, prefers-reduced-data.')
+    })
+
     it('still warns when some preference features are found inline', async () => {
       const result = await checkPreferenceMediaQueries(
         makePageData(COLOR_SCHEME_ONLY_HTML, [], [STYLESHEET])

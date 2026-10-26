@@ -260,6 +260,30 @@ describe('checkResponsiveDesign (WSG 3.13)', () => {
       expect(result.details).toContain('No @media rules')
     })
 
+    it('ignores a commented-out @import, so no external CSS is assumed', async () => {
+      const result = await checkResponsiveDesign(
+        makePageData({
+          metaTags: [VIEWPORT_META],
+          resources: [],
+          body: '<!DOCTYPE html><html lang="en"><head><style>/* @import url("/old.css"); */</style></head><body></body></html>',
+        })
+      )
+      expect(result.status).toBe('warn')
+      expect(result.details).toContain('No @media rules')
+    })
+
+    it('does not credit a commented-out @media rule', async () => {
+      const result = await checkResponsiveDesign(
+        makePageData({
+          metaTags: [VIEWPORT_META],
+          resources: [],
+          body: '<!DOCTYPE html><html lang="en"><head><style>/* @media (max-width: 600px) { .nav { display: none; } } */</style></head><body></body></html>',
+        })
+      )
+      expect(result.status).toBe('warn')
+      expect(result.details).toContain('No @media rules')
+    })
+
     it('includes a recommendation and resources link on info', async () => {
       const result = await checkResponsiveDesign(
         makePageData({ metaTags: [VIEWPORT_META], resources: [STYLESHEET] })

@@ -41,6 +41,10 @@ const RESOURCES = ['https://www.w3.org/TR/web-sustainability-guidelines/#respons
 /** `<style>` block extractor. */
 const STYLE_BLOCK_PATTERN = /<style\b[^>]*>([\s\S]*?)<\/style>/gi
 
+// A commented-out @import or @media must not count, so comments are dropped
+// before any search. Stripped per block: each <style> is its own stylesheet.
+const CSS_COMMENT_PATTERN = /\/\*[\s\S]*?\*\//g
+
 /** Matches any `@media` rule in CSS text. */
 const MEDIA_QUERY_PATTERN = /@media/i
 
@@ -58,7 +62,9 @@ const CSS_IMPORT_PATTERN = new RegExp(
  * instead would let a pattern span `</style>…<style>` and match page text.
  */
 const extractInlineCss = (body: string): string =>
-  Array.from(body.matchAll(STYLE_BLOCK_PATTERN), (m) => m[1]).join('\n')
+  Array.from(body.matchAll(STYLE_BLOCK_PATTERN), (m) => m[1])
+    .map((css) => css.replace(CSS_COMMENT_PATTERN, ''))
+    .join('\n')
 
 const MEDIA_QUERY_NOT_VERIFIABLE =
   'CSS media queries not verifiable: declared in external CSS, which is not analysed'

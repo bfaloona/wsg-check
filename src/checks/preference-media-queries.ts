@@ -52,6 +52,10 @@ const STYLE_BLOCK_PATTERN = /<style\b[^>]*>([\s\S]*?)<\/style>/gi
 /** An inline `@import` pulls in external CSS the parser does not list as a resource. */
 const CSS_IMPORT_PATTERN = /@import\b/i
 
+// A commented-out @import or prefers-* query must not count, so comments are
+// dropped before any search. Stripped per block: each <style> is its own stylesheet.
+const CSS_COMMENT_PATTERN = /\/\*[\s\S]*?\*\//g
+
 /**
  * Extract all inline `<style>` block contents from raw HTML.
  */
@@ -60,7 +64,7 @@ function extractStyleBlockContent(body: string): string {
   const regex = new RegExp(STYLE_BLOCK_PATTERN.source, 'gi')
   let match: RegExpExecArray | null
   while ((match = regex.exec(body)) !== null) {
-    contents.push(match[1])
+    contents.push(match[1].replace(CSS_COMMENT_PATTERN, ''))
   }
   return contents.join('\n')
 }
