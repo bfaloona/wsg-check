@@ -9,7 +9,7 @@
 
 import { isIP } from 'node:net'
 import { lookup } from 'node:dns/promises'
-import { normalizeHost } from './host-policy'
+import { normalizeHost, parseIpv6 } from './host-policy'
 
 /**
  * Returns `true` when the IPv4 address is in a private/loopback range.
@@ -34,12 +34,13 @@ export const isPrivateIpv6 = (address: string): boolean => {
   // Unspecified and loopback
   if (lower === '::' || lower === '::1') return true
 
-  // IPv4-mapped IPv6 (e.g. ::ffff:127.0.0.1).
-  // We only need to block cases where the mapped IPv4 is private/loopback.
-  if (lower.startsWith('::ffff:')) {
-    const ipv4Candidate = lower.substring(lower.lastIndexOf(':') + 1)
-    if (isIP(ipv4Candidate) === 4 && isPrivateIpv4(ipv4Candidate)) {
-      return true
+  // IPv4-mapped IPv6 (::ffff:0:0/96): private when the embedded IPv4 is. Parse the
+  // groups because `URL` and `dns.lookup` spell these in hex (::ffff:7f00:1).
+  const groups = parseIpv6(lower)
+  if (groups !== null) {
+    const [g0, g1, g2, g3, g4, g5, g6, g7] = groups
+    if (g0 === 0 && g1 === 0 && g2 === 0 && g3 === 0 && g4 === 0 && g5 === 0xffff) {
+      return isPrivateIpv4(`${g6 >> 8}.${g6 & 0xff}.${g7 >> 8}.${g7 & 0xff}`)
     }
   }
 
