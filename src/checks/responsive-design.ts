@@ -38,11 +38,21 @@ const SUCCESS_CRITERION =
   'Pages must include a viewport meta tag; images should use srcset; CSS should use media queries'
 const RESOURCES = ['https://www.w3.org/TR/web-sustainability-guidelines/#responsive-layouts']
 
-/** Matches any `@media` rule inside a `<style>` block. */
-const MEDIA_QUERY_IN_STYLE_PATTERN = /<style\b[^>]*>[\s\S]*?@media[\s\S]*?<\/style>/i
+/** `<style>` block extractor. */
+const STYLE_BLOCK_PATTERN = /<style\b[^>]*>([\s\S]*?)<\/style>/gi
 
-/** Matches an `@import` inside a `<style>` block (external CSS). */
-const CSS_IMPORT_IN_STYLE_PATTERN = /<style\b[^>]*>[\s\S]*?@import\b[\s\S]*?<\/style>/i
+/** Matches any `@media` rule in CSS text. */
+const MEDIA_QUERY_PATTERN = /@media/i
+
+/** An inline `@import` pulls in external CSS the parser does not list as a resource. */
+const CSS_IMPORT_PATTERN = /@import\b/i
+
+/**
+ * Join the contents of all inline `<style>` blocks. Searching the raw HTML
+ * instead would let a pattern span `</style>…<style>` and match page text.
+ */
+const extractInlineCss = (body: string): string =>
+  Array.from(body.matchAll(STYLE_BLOCK_PATTERN), (m) => m[1]).join('\n')
 
 const MEDIA_QUERY_NOT_VERIFIABLE =
   'CSS media queries not verifiable: declared in external CSS, which is not analysed'
@@ -96,10 +106,11 @@ export const checkResponsiveDesign: CheckFn = (page) => {
   }
 
   // ── 3. CSS media queries in inline styles ─────────────────────────────────
-  const hasMediaQuery = MEDIA_QUERY_IN_STYLE_PATTERN.test(page.fetchResult.body)
+  const inlineCss = extractInlineCss(page.fetchResult.body)
+  const hasMediaQuery = MEDIA_QUERY_PATTERN.test(inlineCss)
   const hasExternalCss =
     page.parsedPage.resources.some((r) => r.type === 'stylesheet') ||
-    CSS_IMPORT_IN_STYLE_PATTERN.test(page.fetchResult.body)
+    CSS_IMPORT_PATTERN.test(inlineCss)
   // With linked CSS, a missing inline @media proves nothing.
   const mediaQueryNote = !hasMediaQuery && hasExternalCss ? MEDIA_QUERY_NOT_VERIFIABLE : undefined
   if (!hasMediaQuery && !hasExternalCss) {

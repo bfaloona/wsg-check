@@ -215,6 +215,34 @@ describe('checkResponsiveDesign (WSG 3.13)', () => {
       expect(result.status).toBe('info')
     })
 
+    it('ignores @import in page text between two style blocks', async () => {
+      const result = await checkResponsiveDesign(
+        makePageData({
+          metaTags: [VIEWPORT_META],
+          resources: [],
+          body:
+            '<!DOCTYPE html><html lang="en"><head><style>body { margin: 0; }</style></head>' +
+            '<body><p>Use @import to load CSS.</p><style>p { color: red; }</style></body></html>',
+        })
+      )
+      expect(result.status).toBe('warn')
+      expect(result.details).toContain('No @media rules')
+    })
+
+    it('ignores @media in page text between two style blocks', async () => {
+      const result = await checkResponsiveDesign(
+        makePageData({
+          metaTags: [VIEWPORT_META],
+          resources: [],
+          body:
+            '<!DOCTYPE html><html lang="en"><head><style>body { margin: 0; }</style></head>' +
+            '<body><p>Use @media to adapt layouts.</p><style>p { color: red; }</style></body></html>',
+        })
+      )
+      expect(result.status).toBe('warn')
+      expect(result.details).toContain('No @media rules')
+    })
+
     it('includes a recommendation and resources link on info', async () => {
       const result = await checkResponsiveDesign(
         makePageData({ metaTags: [VIEWPORT_META], resources: [STYLESHEET] })
