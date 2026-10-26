@@ -439,7 +439,15 @@ describe('HttpClient — host policy', () => {
     expect(result.value.redirectChain).toHaveLength(1)
   })
 
-  it('follows an IPv6 loopback self-redirect when no policy is set', async () => {
+  it.each([
+    { kind: 'IPv6', start: 'http://[::1]:3000/slash', expected: 'http://[::1]:3000/slash/' },
+    // new URL() rewrites [::ffff:127.0.0.1] to the hex form [::ffff:7f00:1].
+    {
+      kind: 'IPv4-mapped',
+      start: 'http://[::ffff:127.0.0.1]:3000/slash',
+      expected: 'http://[::ffff:7f00:1]:3000/slash/',
+    },
+  ])('follows an $kind loopback self-redirect when no policy is set', async ({ start, expected }) => {
     // Real lookup() rejects a bracketed literal, so if the hop wrongly reaches
     // the DNS guard instead of the local-name exemption it must be refused.
     lookupMock.mockRejectedValue(new Error('ENOTFOUND'))
@@ -447,27 +455,11 @@ describe('HttpClient — host policy', () => {
     mockGet.mockResolvedValueOnce(axiosResp(308, '', { location: '/slash/' }))
     mockGet.mockResolvedValueOnce(axiosResp(200, '<html/>'))
 
-    const result = await new HttpClient().fetch('http://[::1]:3000/slash')
+    const result = await new HttpClient().fetch(start)
 
     expect(result.ok ? undefined : result.error.message).toBeUndefined()
     if (!result.ok) return
-    expect(result.value.url).toBe('http://[::1]:3000/slash/')
-    expect(result.value.redirectChain).toHaveLength(1)
-    expect(lookupMock).not.toHaveBeenCalled()
-  })
-
-  it('follows an IPv4-mapped loopback self-redirect when no policy is set', async () => {
-    // new URL() rewrites [::ffff:127.0.0.1] to the hex form [::ffff:7f00:1].
-    lookupMock.mockRejectedValue(new Error('ENOTFOUND'))
-    mockGet.mockResolvedValueOnce(axiosResp(404, '')) // robots
-    mockGet.mockResolvedValueOnce(axiosResp(308, '', { location: '/slash/' }))
-    mockGet.mockResolvedValueOnce(axiosResp(200, '<html/>'))
-
-    const result = await new HttpClient().fetch('http://[::ffff:127.0.0.1]:3000/slash')
-
-    expect(result.ok ? undefined : result.error.message).toBeUndefined()
-    if (!result.ok) return
-    expect(result.value.url).toBe('http://[::ffff:7f00:1]:3000/slash/')
+    expect(result.value.url).toBe(expected)
     expect(result.value.redirectChain).toHaveLength(1)
     expect(lookupMock).not.toHaveBeenCalled()
   })
