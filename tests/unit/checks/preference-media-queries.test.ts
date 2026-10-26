@@ -187,13 +187,15 @@ describe('checkPreferenceMediaQueries (WSG 3.12)', () => {
     })
 
     it('returns info when the only external CSS is an inline @import', async () => {
-      const body = `<!DOCTYPE html><html lang="en"><head><style>@import url("/s.css");</style></head><body></body></html>`
+      const body =
+        '<!DOCTYPE html><html lang="en"><head><style>@import url("/s.css");</style></head><body></body></html>'
       const result = await checkPreferenceMediaQueries(makePageData(body))
       expect(result.status).toBe('info')
     })
 
     it('ignores a commented-out @import, so no external CSS is assumed', async () => {
-      const body = `<!DOCTYPE html><html lang="en"><head><style>/* @import url("/s.css"); */</style></head><body></body></html>`
+      const body =
+        '<!DOCTYPE html><html lang="en"><head><style>/* @import url("/s.css"); */</style></head><body></body></html>'
       const result = await checkPreferenceMediaQueries(makePageData(body))
       expect(result.status).toBe('warn')
     })

@@ -180,7 +180,8 @@ describe('checkResponsiveDesign (WSG 3.13)', () => {
       attributes: { rel: 'stylesheet', href: '/s.css' },
     }
     /** Repro fixture /extcss/: viewport, one linked stylesheet, no inline CSS. */
-    const EXTERNAL_CSS_ONLY_HTML = `<!DOCTYPE html><html lang=en><head><meta charset="utf-8"><meta name="viewport" content="width=device-width"><title>t</title><link rel="stylesheet" href="/s.css"></head><body><p>x</p></body></html>`
+    const EXTERNAL_CSS_ONLY_HTML =
+      '<!DOCTYPE html><html lang=en><head><meta charset="utf-8"><meta name="viewport" content="width=device-width"><title>t</title><link rel="stylesheet" href="/s.css"></head><body><p>x</p></body></html>'
 
     it('reports info, not warn, when no inline CSS exists and a stylesheet is linked', async () => {
       const result = await checkResponsiveDesign(
