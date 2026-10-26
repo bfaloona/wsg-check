@@ -215,6 +215,23 @@ describe('checkResponsiveDesign (WSG 3.13)', () => {
       expect(result.status).toBe('info')
     })
 
+    it.each([
+      '@import "a.css";',
+      "@import 'a.css';",
+      '@import url("a.css") screen and (min-width: 600px);',
+      "@import url('a.css') layer(base);",
+      '@import url(a.css) supports(display: grid);',
+    ])('treats %s as linked external CSS', async (rule) => {
+      const result = await checkResponsiveDesign(
+        makePageData({
+          metaTags: [VIEWPORT_META],
+          resources: [],
+          body: `<!DOCTYPE html><html lang="en"><head><style>${rule}</style></head><body></body></html>`,
+        })
+      )
+      expect(result.status).toBe('info')
+    })
+
     it('ignores @import in page text between two style blocks', async () => {
       const result = await checkResponsiveDesign(
         makePageData({

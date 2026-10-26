@@ -44,8 +44,14 @@ const STYLE_BLOCK_PATTERN = /<style\b[^>]*>([\s\S]*?)<\/style>/gi
 /** Matches any `@media` rule in CSS text. */
 const MEDIA_QUERY_PATTERN = /@media/i
 
-/** An inline `@import` pulls in external CSS the parser does not list as a resource. */
-const CSS_IMPORT_PATTERN = /@import\b/i
+// An inline `@import` pulls in external CSS the parser does not list as a resource.
+// It deliberately accepts both the bare-string and url(...) forms, quoted or unquoted.
+const QUOTED_STRING = String.raw`"[^"]*"|'[^']*'`
+const URL_FUNCTION = String.raw`url\(\s*(?:${QUOTED_STRING}|[^\s)]+)\s*\)`
+const CSS_IMPORT_PATTERN = new RegExp(
+  String.raw`@import\s*(?:${URL_FUNCTION}|${QUOTED_STRING})`,
+  'i'
+)
 
 /**
  * Join the contents of all inline `<style>` blocks. Searching the raw HTML
