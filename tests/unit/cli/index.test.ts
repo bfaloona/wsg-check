@@ -174,7 +174,7 @@ describe('runCheck', () => {
     stdoutSpy = vi.spyOn(process.stdout, 'write').mockImplementation(() => true)
     stderrSpy = vi.spyOn(process.stderr, 'write').mockImplementation(() => true)
     // runCheck reads the real environment; a host-exported WSG_IGNORE_ROBOTS would change the asserted default.
-    vi.stubEnv('WSG_IGNORE_ROBOTS', undefined)
+    vi.stubEnv('WSG_IGNORE_ROBOTS', undefined) // skipcq: JS-W1042 (undefined unsets the variable; the argument is required)
     // Reset the mock before each test
     const mockCheck = await getMockCheck()
     mockCheck.mockReset()

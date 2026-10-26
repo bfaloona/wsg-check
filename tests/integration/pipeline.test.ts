@@ -558,7 +558,7 @@ describe('Full pipeline integration — WsgChecker.check()', () => {
 
     it('marks the User-Agent only when ignoreRobots is set', () => {
       const userAgentFor = (config: { ignoreRobots?: boolean; userAgent?: string }): string => {
-        new WsgChecker(config, ALL_CHECKS)
+        expect(() => new WsgChecker(config, ALL_CHECKS)).not.toThrow()
         return axiosCreateConfigs.at(-1)?.headers?.['User-Agent'] ?? ''
       }
       expect(userAgentFor({})).not.toContain('ignore-robots')
