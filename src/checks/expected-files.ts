@@ -47,14 +47,20 @@ const EF_RESOURCES = [
 /** `rel` values that indicate a favicon `<link>` element. */
 const FAVICON_RELS = new Set(['icon', 'shortcut icon', 'apple-touch-icon'])
 
+/** Lower-cased hostname with one leading `www.` removed; scheme and port ignored. */
+const siteOf = (url: string): string => new URL(url).hostname.toLowerCase().replace(/^www\./, '')
+
 export const checkExpectedFiles: CheckFn = (page) => {
   const { links } = page.parsedPage
+  const { originalUrl, url, robotsSitemaps } = page.fetchResult
 
   const hasFavicon = links.some((l) => l.rel && FAVICON_RELS.has(l.rel.toLowerCase()))
   const hasManifest = links.some((l) => l.rel?.toLowerCase() === 'manifest')
-  const hasSitemap =
-    links.some((l) => l.rel?.toLowerCase() === 'sitemap') ||
-    (page.fetchResult.robotsSitemaps?.length ?? 0) > 0
+  // robots.txt was read from the requested host. After a redirect to a different
+  // site, its Sitemap: lines describe a site the scored page is not on, so they
+  // would give the destination unearned credit.
+  const robotsApply = (robotsSitemaps?.length ?? 0) > 0 && siteOf(originalUrl) === siteOf(url)
+  const hasSitemap = links.some((l) => l.rel?.toLowerCase() === 'sitemap') || robotsApply
 
   const missing: string[] = []
   if (!hasFavicon) missing.push('favicon (<link rel="icon">)')
