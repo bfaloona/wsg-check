@@ -141,7 +141,7 @@ describe('HttpClient request headers', () => {
   })
 
   it('leaves the instance User-Agent in place when headers are set', () => {
-    new HttpClient({ headers: HEADERS })
+    expect(() => new HttpClient({ headers: HEADERS })).not.toThrow()
     const config = (mockCreate.mock.calls[0] as unknown[])[0] as { headers: unknown }
     expect(config.headers).toEqual({ 'User-Agent': expect.stringContaining('wsg-check/') })
   })
