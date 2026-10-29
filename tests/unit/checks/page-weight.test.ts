@@ -18,6 +18,7 @@ function makePageData(htmlSize: number, resourceCount = 0, bodySize = htmlSize):
       statusCode: 200,
       headers: {},
       body: 'x'.repeat(bodySize),
+      bodyByteLength: bodySize,
       redirectChain: [],
       fromCache: false,
       contentLength: htmlSize,

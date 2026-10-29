@@ -233,6 +233,8 @@ describe('HttpClient', () => {
     expect(result.ok).toBe(true)
     if (!result.ok) return
     expect(result.value.contentLength).toBe(10)
+    expect(result.value.body).toBe('<html>hello</html>')
+    expect(result.value.bodyByteLength).toBe(Buffer.byteLength('<html>hello</html>'))
   })
 
   it('reports 0 contentLength when no body bytes were received', async () => {

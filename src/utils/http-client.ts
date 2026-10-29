@@ -46,6 +46,11 @@ export interface FetchResult {
    * sent a `Content-Length` header or used chunked transfer encoding.
    */
   contentLength: number
+  /**
+   * Byte length of the body after decompression and before text decoding, so it
+   * is exact for any charset. Set on every fetched response.
+   */
+  bodyByteLength?: number
   contentEncoding?: string
   contentType?: string
 }
@@ -81,6 +86,13 @@ const DEFAULT_OPTIONS: Required<Omit<HttpClientOptions, 'hostPolicy' | 'signal'>
 }
 
 const MAX_REDIRECTS = 10
+
+/** Response body as bytes: a Buffer from the Node adapter, an ArrayBuffer elsewhere, a string from mocks. */
+const toBuffer = (data: unknown): Buffer => {
+  if (Buffer.isBuffer(data)) return data
+  if (data instanceof ArrayBuffer) return Buffer.from(data)
+  return Buffer.from(data === undefined || data === null ? '' : String(data), 'utf8')
+}
 
 // ─── HttpClient ───────────────────────────────────────────────────────────────
 
@@ -257,8 +269,9 @@ export class HttpClient {
       // final `loaded` is the number of bytes received whatever the framing.
       // Its last event is delivered before the request promise settles.
       let bytesReceived = 0
-      const resp = await this.axiosInstance.get<string>(currentUrl, {
-        responseType: 'text',
+      const resp = await this.axiosInstance.get<unknown>(currentUrl, {
+        // Bytes, not text, so the decompressed size can be measured before decoding.
+        responseType: 'arraybuffer',
         onDownloadProgress: (event) => {
           bytesReceived = event.loaded
         },
@@ -336,7 +349,7 @@ export class HttpClient {
   private buildResult(
     originalUrl: string,
     finalUrl: string,
-    resp: AxiosResponse<string>,
+    resp: AxiosResponse<unknown>,
     redirectChain: RedirectEntry[],
     contentLength: number
   ): FetchResult {
@@ -349,7 +362,10 @@ export class HttpClient {
       }
     }
 
-    const body = typeof resp.data === 'string' ? resp.data : String(resp.data)
+    // Decode as axios does for text responses: UTF-8, then drop a leading BOM.
+    const bytes = toBuffer(resp.data)
+    const text = bytes.toString('utf8')
+    const body = text.charCodeAt(0) === 0xfeff ? text.slice(1) : text
 
     return {
       url: finalUrl,
@@ -360,6 +376,7 @@ export class HttpClient {
       redirectChain,
       fromCache: false,
       contentLength,
+      bodyByteLength: bytes.length,
       contentEncoding: headers['content-encoding'],
       contentType: headers['content-type'],
     }

@@ -44,8 +44,10 @@ export const checkPageWeight: CheckFn = (page) => {
 
   const htmlKb = Math.round(htmlSize / 1024)
   // The budget applies to transferred bytes; also show the uncompressed size when
-  // it differs, since that is the size visible in the document itself.
-  const uncompressedKb = Math.round(new TextEncoder().encode(page.fetchResult.body).length / 1024)
+  // it differs, since that is the size visible in the document itself. It is the
+  // byte count before text decoding, so it is right for any charset.
+  const uncompressed = page.fetchResult.bodyByteLength
+  const uncompressedKb = uncompressed === undefined ? htmlKb : Math.round(uncompressed / 1024)
   const htmlLabel =
     uncompressedKb === htmlKb
       ? `${htmlKb} KB`
