@@ -13,7 +13,7 @@ export const DEFAULT_CONFIG: Omit<WSGCheckConfig, 'url'> = {
 
   timeout: 30_000, // 30 seconds
   maxDepth: 1, // single page by default
-  userAgent: `Mozilla/5.0 (compatible; wsg-check/${VERSION}; +https://github.com/bfaloona/wsg-check)`,
+  userAgent: `Mozilla/5.0 (compatible; wsg-check/${VERSION}; +https://github.com/ivanoats/wsg-check)`,
   followRedirects: true,
   ignoreRobots: false, // honour robots.txt (WSG: respect opt-out signals)
   headers: {},
