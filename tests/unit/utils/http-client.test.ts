@@ -249,21 +249,26 @@ describe('HttpClient', () => {
 
   it('recovers content-encoding from raw response headers when axios has removed it', async () => {
     mockGet.mockResolvedValueOnce(axiosResp(404, ''))
-    mockGet.mockResolvedValueOnce({
-      ...axiosResp(200, '<html/>', { 'content-type': 'text/html', 'content-length': '56' }),
-      request: {
-        res: {
-          rawHeaders: [
-            'Content-Type',
-            'text/html',
-            'Content-Encoding',
-            'gzip',
-            'Content-Length',
-            '56',
-          ],
-        },
-      },
-    })
+    mockGet.mockImplementationOnce(
+      (_url: string, config: { onDownloadProgress?: (e: { loaded: number }) => void }) => {
+        config.onDownloadProgress?.({ loaded: 56 })
+        return Promise.resolve({
+          ...axiosResp(200, '<html/>', { 'content-type': 'text/html', 'content-length': '56' }),
+          request: {
+            res: {
+              rawHeaders: [
+                'Content-Type',
+                'text/html',
+                'Content-Encoding',
+                'gzip',
+                'Content-Length',
+                '56',
+              ],
+            },
+          },
+        })
+      }
+    )
 
     const client = new HttpClient()
     const result = await client.fetch('https://example.com/')
