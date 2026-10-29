@@ -8,7 +8,12 @@
  *   - Records the full redirect chain (WSG 4.4)
  */
 
-import axios, { AxiosError, type AxiosInstance, type AxiosResponse } from 'axios'
+import axios, {
+  AxiosError,
+  type AxiosInstance,
+  type AxiosRequestConfig,
+  type AxiosResponse,
+} from 'axios'
 import robotsParser from 'robots-parser'
 import { FetchError, type Result, ok, err } from './errors'
 import { isDisallowedHost, dnsResolvesToPrivateAddress } from './ssrf'
@@ -91,7 +96,7 @@ const MAX_REDIRECTS = 10
 const toBuffer = (data: unknown): Buffer => {
   if (Buffer.isBuffer(data)) return data
   if (data instanceof ArrayBuffer) return Buffer.from(data)
-  return Buffer.from(data === undefined || data === null ? '' : String(data), 'utf8')
+  return typeof data === 'string' ? Buffer.from(data, 'utf8') : Buffer.alloc(0)
 }
 
 // ─── HttpClient ───────────────────────────────────────────────────────────────
@@ -269,19 +274,22 @@ export class HttpClient {
       // final `loaded` is the number of bytes received whatever the framing.
       // Its last event is delivered before the request promise settles.
       let bytesReceived = 0
-      const resp = await this.axiosInstance.get<unknown>(currentUrl, {
+      const request: AxiosRequestConfig = {
         // Bytes, not text, so the decompressed size can be measured before decoding.
         responseType: 'arraybuffer',
         onDownloadProgress: (event) => {
           bytesReceived = event.loaded
         },
         ...this.connectOptions(currentClass),
-      })
+      }
+      // The start URL and every redirect hop pass the SSRF guard (hostPolicy,
+      // isDisallowedHost, DNS check) before this request is made.
+      const resp = await this.axiosInstance.get<unknown>(currentUrl, request) // NOSONAR
 
       if (resp.status >= 300 && resp.status < 400) {
         if (!this.opts.followRedirects) {
           // Caller asked not to follow – return the redirect response as-is.
-          return this.buildResult(startUrl, currentUrl, resp, redirectChain, bytesReceived)
+          return HttpClient.buildResult(startUrl, currentUrl, resp, redirectChain, bytesReceived)
         }
 
         const location = (resp.headers as Record<string, string>)['location']
@@ -303,7 +311,7 @@ export class HttpClient {
         continue
       }
 
-      return this.buildResult(startUrl, currentUrl, resp, redirectChain, bytesReceived)
+      return HttpClient.buildResult(startUrl, currentUrl, resp, redirectChain, bytesReceived)
     }
 
     throw new FetchError(`Too many redirects (> ${MAX_REDIRECTS}) for ${startUrl}`, startUrl)
@@ -346,7 +354,7 @@ export class HttpClient {
     return undefined
   }
 
-  private buildResult(
+  private static buildResult(
     originalUrl: string,
     finalUrl: string,
     resp: AxiosResponse<unknown>,
@@ -365,7 +373,7 @@ export class HttpClient {
     // Decode as axios does for text responses: UTF-8, then drop a leading BOM.
     const bytes = toBuffer(resp.data)
     const text = bytes.toString('utf8')
-    const body = text.charCodeAt(0) === 0xfeff ? text.slice(1) : text
+    const body = text.codePointAt(0) === 0xfeff ? text.slice(1) : text
 
     return {
       url: finalUrl,
