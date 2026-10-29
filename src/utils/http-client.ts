@@ -40,11 +40,10 @@ export interface FetchResult {
   /** `true` when the result was served from the in-memory cache. */
   fromCache: boolean
   /**
-   * Transfer size in bytes as reported by the `Content-Length` response header.
-   * This is the **compressed** size when `Content-Encoding` is present, giving an
-   * accurate picture of network bandwidth used (relevant for sustainability metrics).
-   * Falls back to the decompressed body byte-length when the header is absent
-   * (e.g. chunked transfer encoding).
+   * Transfer size: bytes of the final response body as received over the network,
+   * counted before decompression. This is the **compressed** size when
+   * `Content-Encoding` is present, and it does not depend on whether the server
+   * sent a `Content-Length` header or used chunked transfer encoding.
    */
   contentLength: number
   contentEncoding?: string
@@ -254,15 +253,22 @@ export class HttpClient {
     let currentClass = startClass
 
     for (let hop = 0; hop <= MAX_REDIRECTS; hop++) {
+      // axios counts download progress before it decompresses the body, so the
+      // final `loaded` is the number of bytes received whatever the framing.
+      // Its last event is delivered before the request promise settles.
+      let bytesReceived = 0
       const resp = await this.axiosInstance.get<string>(currentUrl, {
         responseType: 'text',
+        onDownloadProgress: (event) => {
+          bytesReceived = event.loaded
+        },
         ...this.connectOptions(currentClass),
       })
 
       if (resp.status >= 300 && resp.status < 400) {
         if (!this.opts.followRedirects) {
           // Caller asked not to follow – return the redirect response as-is.
-          return this.buildResult(startUrl, currentUrl, resp, redirectChain)
+          return this.buildResult(startUrl, currentUrl, resp, redirectChain, bytesReceived)
         }
 
         const location = (resp.headers as Record<string, string>)['location']
@@ -284,7 +290,7 @@ export class HttpClient {
         continue
       }
 
-      return this.buildResult(startUrl, currentUrl, resp, redirectChain)
+      return this.buildResult(startUrl, currentUrl, resp, redirectChain, bytesReceived)
     }
 
     throw new FetchError(`Too many redirects (> ${MAX_REDIRECTS}) for ${startUrl}`, startUrl)
@@ -331,7 +337,8 @@ export class HttpClient {
     originalUrl: string,
     finalUrl: string,
     resp: AxiosResponse<string>,
-    redirectChain: RedirectEntry[]
+    redirectChain: RedirectEntry[],
+    contentLength: number
   ): FetchResult {
     const headers: Record<string, string> = {}
     for (const [key, value] of Object.entries(resp.headers as Record<string, unknown>)) {
@@ -343,15 +350,6 @@ export class HttpClient {
     }
 
     const body = typeof resp.data === 'string' ? resp.data : String(resp.data)
-
-    // Prefer the Content-Length header so the value reflects the compressed
-    // transfer size (accurate bandwidth metric for sustainability analysis).
-    // Fall back to body byte-length when the header is absent (chunked transfer).
-    const headerContentLength = headers['content-length']
-    const contentLength =
-      headerContentLength !== undefined
-        ? parseInt(headerContentLength, 10) || body.length
-        : body.length
 
     return {
       url: finalUrl,
