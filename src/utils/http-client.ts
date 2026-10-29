@@ -88,7 +88,7 @@ type DefaultedOptions = Required<Omit<HttpClientOptions, 'hostPolicy' | 'signal'
 
 const DEFAULT_OPTIONS: DefaultedOptions = {
   timeout: 30_000,
-  userAgent: `Mozilla/5.0 (compatible; wsg-check/${VERSION}; +https://github.com/bfaloona/wsg-check)`,
+  userAgent: `Mozilla/5.0 (compatible; wsg-check/${VERSION}; +https://github.com/ivanoats/wsg-check)`,
   followRedirects: true,
   maxRetries: 2,
   retryDelay: 500,
