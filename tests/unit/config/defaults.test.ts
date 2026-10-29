@@ -49,4 +49,9 @@ describe('DEFAULT_CONFIG', () => {
   it('has no request headers by default', () => {
     expect(DEFAULT_CONFIG.headers).toEqual({})
   })
+
+  it('identifies the fork in the default User-Agent and keeps the wsg-check token', () => {
+    expect(DEFAULT_CONFIG.userAgent).toContain('wsg-check/')
+    expect(DEFAULT_CONFIG.userAgent).toContain('+https://github.com/bfaloona/wsg-check')
+  })
 })
