@@ -87,7 +87,8 @@ describe('HttpClient', () => {
     await client.fetch('https://example.com/')
     const cached = await client.fetch('https://example.com/')
 
-    expect(mockGet).toHaveBeenCalledTimes(2)
+    // robots, page and four standard-file probes; the second fetch is cached
+    expect(mockGet).toHaveBeenCalledTimes(6)
     expect(cached.ok).toBe(true)
     if (!cached.ok) return
     expect(cached.value.fromCache).toBe(true)
@@ -104,13 +105,26 @@ describe('HttpClient', () => {
     expect(result.error).toBeInstanceOf(FetchError)
   })
 
+  it('bounds the standard-file requests even when the client timeout is 0 (unlimited)', async () => {
+    mockGet.mockResolvedValueOnce(axiosResp(404, '')) // robots
+    mockGet.mockResolvedValueOnce(axiosResp(200, '<html/>'))
+
+    await new HttpClient({ timeout: 0 }).fetch('https://example.com/')
+
+    const probeTimeouts = mockGet.mock.calls
+      .filter(([url]) => /\/(humans|security|carbon)\.txt$/.test(url as string))
+      .map(([, config]) => (config as { timeout?: number }).timeout)
+    expect(probeTimeouts).toEqual([5_000, 5_000, 5_000, 5_000])
+  })
+
   it('ignores robots.txt when ignoreRobots is true', async () => {
     mockGet.mockResolvedValueOnce(axiosResp(200, '<html/>'))
 
     const client = new HttpClient()
     const result = await client.fetch('https://example.com/', { ignoreRobots: true })
 
-    expect(mockGet).toHaveBeenCalledTimes(1)
+    // page and four standard-file probes
+    expect(mockGet).toHaveBeenCalledTimes(5)
     expect(result.ok).toBe(true)
     if (!result.ok) return
     expect(result.value.statusCode).toBe(200)
@@ -518,15 +532,46 @@ describe('HttpClient — host policy', () => {
     expect(result.error.message).toContain('into loopback are not allowed')
   })
 
-  it('pins the robots.txt and page requests to the approved address class', async () => {
+  it('pins the robots.txt, page and standard-file requests to the approved address class', async () => {
     mockGet.mockResolvedValueOnce(axiosResp(404, '')) // robots
     mockGet.mockResolvedValueOnce(axiosResp(200, '<html/>'))
 
     await new HttpClient({ hostPolicy: LOCAL_DEV }).fetch('https://example.com/')
 
-    expect(mockGet).toHaveBeenCalledTimes(2)
+    expect(mockGet).toHaveBeenCalledTimes(6)
     for (const [, config] of mockGet.mock.calls) {
       expect(typeof (config as { lookup?: unknown }).lookup).toBe('function')
+    }
+  })
+
+  it('pins standard-file requests after a cross-origin redirect to the class the redirect guard approved', async () => {
+    // a.example and b.example look public while the page is fetched, then
+    // b.example rebinds to loopback (TTL 0) before the standard files are requested.
+    lookupMock.mockReset()
+    lookupMock
+      .mockResolvedValueOnce([{ address: '93.184.216.34', family: 4 }]) // NOSONAR - intentional public IP
+      .mockResolvedValueOnce([{ address: '93.184.216.35', family: 4 }]) // NOSONAR - intentional public IP
+      .mockResolvedValue([{ address: '127.0.0.1', family: 4 }])
+    mockGet.mockResolvedValueOnce(axiosResp(302, '', { location: 'https://b.example/' }))
+    mockGet.mockResolvedValueOnce(axiosResp(200, '<html/>'))
+
+    const result = await new HttpClient({ hostPolicy: LOCAL_DEV }).fetch('https://a.example/', {
+      ignoreRobots: true,
+    })
+
+    expect(result.ok).toBe(true)
+    const probes = mockGet.mock.calls.slice(2)
+    expect(probes).toHaveLength(4)
+    for (const [url, config] of probes) {
+      expect(url).toMatch(/^https:\/\/b\.example\//)
+      const { lookup } = config as {
+        lookup: (host: string, opts: object, cb: (err: Error | null) => void) => void
+      }
+      const error = await new Promise<Error | null>((resolve) =>
+        lookup('b.example', {}, (e) => resolve(e))
+      )
+      expect(error, 'probe connected to a loopback address').toBeInstanceOf(Error)
+      expect(error?.message).toContain('outside the approved public range')
     }
   })
 
