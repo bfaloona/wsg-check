@@ -37,7 +37,7 @@ afterEach(async () => {
 })
 
 describe('HttpClient request headers over a real socket', () => {
-  it('a real server receives the header on the start request and the same-host hop, not on robots.txt', async () => {
+  it('a real server receives the header on the start request and the same-host hop, not on robots.txt or the standard-file requests', async () => {
     const seen: Seen[] = []
     const base = await startServer(seen)
     const client = new HttpClient({
@@ -50,10 +50,18 @@ describe('HttpClient request headers over a real socket', () => {
     const result = await client.fetch(`${base}/`)
 
     expect(result.ok && result.value.url).toBe(`${base}/en`)
-    expect(seen.map((s) => [s.url, s.headers.cookie])).toEqual([
+    const requests = seen.map((s) => [s.url, s.headers.cookie])
+    expect(requests.slice(0, 3)).toEqual([
       ['/robots.txt', undefined],
       ['/', 's=1'],
       ['/en', 's=1'],
+    ])
+    // The standard-file requests run in parallel, so their arrival order varies.
+    expect(requests.slice(3).sort()).toEqual([
+      ['/.well-known/carbon.txt', undefined],
+      ['/.well-known/security.txt', undefined],
+      ['/carbon.txt', undefined],
+      ['/humans.txt', undefined],
     ])
     // Per-request headers merge over the instance User-Agent rather than replacing it.
     for (const s of seen) expect(s.headers['user-agent']).toContain('wsg-check')
